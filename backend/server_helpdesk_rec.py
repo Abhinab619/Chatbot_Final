@@ -234,7 +234,7 @@ def chat_with_model(msg: Message):
         formatted_qa = "\n\n".join([f"Q: {pair['question']}\nA: {pair['answer']}" for pair in recent_qa])
     
         prompt = f"""
-        Based on the following recent interactions between the user and the assistant, give three helpful and context-aware follow-up questions, related to only the given answers.
+        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers.
 
         {formatted_qa}
 

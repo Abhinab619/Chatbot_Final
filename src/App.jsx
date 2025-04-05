@@ -20,7 +20,7 @@ export default function App() {
     setMessage("");
 
     try {
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch("https://chatbot-final-hvuc.onrender.com/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: message, user_id: userId }),
