@@ -1,48 +1,63 @@
-import { useState, useEffect } from "react"; //useEffect is added
+import { useState, useEffect } from "react";
 
 export default function App() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState([]);
-  const [userId, setUserId] = useState(localStorage.getItem("user_id") || ""); //added
+  const [userId, setUserId] = useState(localStorage.getItem("user_id") || "");
+  const [suggestions, setSuggestions] = useState([]);
+  const [searchFocused, setSearchFocused] = useState(false);
 
-  useEffect(() => {                                           // this function is added
-    const storedUserId = localStorage.getItem("user_id");     //
-    if (storedUserId) {                                       //
-      setUserId(storedUserId);                                //    
-    }                                                         //
-  }, []);                                                     //
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("user_id");
+    if (storedUserId) {
+      setUserId(storedUserId);
+    }
+  }, []);
 
   const sendMessage = async () => {
     if (!message.trim()) return;
     setChat([...chat, { text: message, sender: "user" }]);
     setMessage("");
-  
+
     try {
-      const response = await fetch("https://helpdesk-final.onrender.com/chat", {
+      const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: message, user_id : userId }),              //changed
+        body: JSON.stringify({ text: message, user_id: userId }),
       });
-  
+
       const data = await response.json();
 
-      if (!userId) {                                                                      //added
-        setUserId(data.user_id);                                                          //added
-        localStorage.setItem("user_id", data.user_id); // Store it permanently            //added
-      }                                                                                   //
-  
+      if (!userId) {
+        setUserId(data.user_id);
+        localStorage.setItem("user_id", data.user_id);
+      }
+
       setChat((prev) => [...prev, { text: data.response, sender: "bot" }]);
+
+      if (data.recommended_question) {
+        const parsedSuggestions = data.recommended_question
+          .split("\n")
+          .map((q) => q.replace(/^\d+\.\s*/, "").trim())
+          .filter(Boolean);
+        setSuggestions(parsedSuggestions);
+      }
     } catch (error) {
       console.error("Error:", error);
       setChat((prev) => [...prev, { text: "Error getting response.", sender: "bot" }]);
     }
   };
-  
+
+  const handleSuggestionClick = (suggestion) => {
+    setMessage(suggestion);
+    setSearchFocused(false);
+    setTimeout(() => sendMessage(), 100); // auto-send after suggestion click
+  };
 
   return (
     <div style={styles.pageContainer}>
       <header style={styles.header}>UDYAMI HELPDESK</header>
-      
+
       <div style={styles.chatContainer}>
         <div style={styles.chatWindow}>
           {chat.map((msg, index) => (
@@ -68,9 +83,36 @@ export default function App() {
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => {
+              setTimeout(() => {
+                const active = document.activeElement;
+                if (!active.closest(".suggestion-box")) {
+                  setSearchFocused(false);
+                }
+              }, 150);
+            }}
           />
           <button onClick={sendMessage} style={styles.button}>Send</button>
         </div>
+
+        {searchFocused && suggestions.length > 0 && (
+          <div className="suggestion-box" style={styles.suggestionBox}>
+            <label style={{ fontSize: "12px", color: "#555" }}>Suggestions:</label>
+            <ul style={styles.suggestionList}>
+              {suggestions.map((s, i) => (
+                <li
+                  key={i}
+                  style={styles.suggestionItem}
+                  onClick={() => handleSuggestionClick(s)}
+                  tabIndex={0}
+                >
+                  {s}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -81,7 +123,6 @@ const styles = {
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
-    justifyContent: "center",
     height: "100vh",
     backgroundColor: "#f4f4f9",
   },
@@ -134,5 +175,24 @@ const styles = {
     border: "none",
     borderRadius: "5px",
     cursor: "pointer",
+  },
+  suggestionBox: {
+    padding: "10px",
+    backgroundColor: "#f1f1f1",
+    borderTop: "1px solid #ddd",
+    maxHeight: "150px",
+    overflowY: "auto",
+  },
+  suggestionList: {
+    listStyle: "none",
+    paddingLeft: "10px",
+    marginTop: "5px",
+    marginBottom: 0,
+  },
+  suggestionItem: {
+    padding: "5px 0",
+    cursor: "pointer",
+    color: "#007bff",
+    fontSize: "14px",
   },
 };

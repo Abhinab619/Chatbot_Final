@@ -146,7 +146,9 @@ def get_user_memory(user_id: str):
     if user_id not in user_memories:
         user_memories[user_id] = {
             "memory" : ConversationSummaryMemory(llm=chat, memory_key="chat_history", return_messages=True),
-            "interaction_count" : 0
+            "interaction_count" : 0,
+            "qa_pairs": []                     ##
+            
         }
         # Logging User connection
 
@@ -188,13 +190,19 @@ def chat_with_model(msg: Message):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     connected_users[user_id]["last_active"] = now
     connected_users[user_id]["total_messages"] += 1
+
+    
+
+
     
     # Reset memory if it gets too large
     if interaction_count >= MAX_MEMORY_SIZE:
         print(f'Memory Reset for {msg.user_id}')
         memory.clear()  # Clears stored history
         user_memories[msg.user_id] = {"memory": ConversationSummaryMemory(llm=chat, memory_key="chat_history", return_messages=True),
-                                      "interaction_count" : 0}
+                                      "interaction_count" : 0,
+                                      "qa_pairs" : []
+                                      }
         memory = user_memories[msg.user_id]["memory"]
         
     agent_executor = AgentExecutor(                                         # Reinitialized agent executor
@@ -207,7 +215,44 @@ def chat_with_model(msg: Message):
         
 
     response = agent_executor.invoke({"input": msg.text})
+
+    # ADDED: Store current question
+    user_data.setdefault("qa_pairs", []).append({
+    "question": msg.text,
+    "answer": response.get("output", "No response generated")
+})
+    
+
     user_memories[user_id]["interaction_count"] += 1  # Increase interaction count
+
+
+
+    # ADDED: Generate recommended question from last 3 questions
+    qa_pairs = user_memories[user_id].get("qa_pairs", [])
+    if qa_pairs:
+        recent_qa = qa_pairs[-3:]
+        formatted_qa = "\n\n".join([f"Q: {pair['question']}\nA: {pair['answer']}" for pair in recent_qa])
+    
+        prompt = f"""
+        Based on the following recent interactions between the user and the assistant, give three helpful and context-aware follow-up questions, related to only the given answers.
+
+        {formatted_qa}
+
+        Given Follow-up short Questions:
+        """
+        suggestion = chat.invoke(prompt)
+        recommended_question = suggestion.content.strip()
+
+    else:
+        recommended_question = "Would you like to ask more about Udyami Yojna eligibility or application process?"
+
+
+    
+    print(f"Recommended follow-up question for user {user_id}: {recommended_question}")
+
+
+
+
 
     # Print logs of all connected users
     print("\n--- Connected Users Log ---")
@@ -218,7 +263,8 @@ def chat_with_model(msg: Message):
     return {
         "user_id" : user_id,
         "response": response.get("output", "No response generated"),
-        "intermediate_steps": response.get("intermediate_steps", [])
+        "intermediate_steps": response.get("intermediate_steps", []),
+        "recommended_question": recommended_question            # ADDED: Return recommended question
     }
 
 
