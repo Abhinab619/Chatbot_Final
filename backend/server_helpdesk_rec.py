@@ -292,3 +292,7 @@ Stores the backend-generated user_id to avoid conflicts."""
 
 
 # see user handling page for more details
+
+
+
+# Tracks last 3 q-a pairs list using the user_memories dictionary, sending them to Gemini, and it returns in the "recommended_question" part
