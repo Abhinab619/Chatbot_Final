@@ -234,7 +234,7 @@ def chat_with_model(msg: Message):
         formatted_qa = "\n\n".join([f"Q: {pair['question']}\nA: {pair['answer']}" for pair in recent_qa])
     
         prompt = f"""
-        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers.
+        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers and from Humans POV .
 
         {formatted_qa}
 
@@ -295,4 +295,5 @@ Stores the backend-generated user_id to avoid conflicts."""
 
 
 
+# Version 0.3
 # Tracks last 3 q-a pairs list using the user_memories dictionary, sending them to Gemini, and it returns in the "recommended_question" part
