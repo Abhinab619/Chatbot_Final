@@ -244,7 +244,7 @@ def chat_with_model(msg: Message):
         recommended_question = suggestion.content.strip()
 
     else:
-        recommended_question = "Would you like to ask more about Udyami Yojna eligibility or application process?"
+        recommended_question = "More about Udyami Yojna eligibility or application process?"
 
 
     
