@@ -166,6 +166,10 @@ def get_user_memory(user_id: str):
     
     return memory_data if memory_data is not None else {}
 
+
+
+
+
 @app.post("/chat")
 def chat_with_model(msg: Message):
     remove_inactive_users()
@@ -215,7 +219,11 @@ def chat_with_model(msg: Message):
         )
         
 
-    response = agent_executor.invoke({"input": msg.text})
+    language_instruction = "Please answer in Hindi." if msg.language == "hi" else "Please answer in English."
+    modified_input = f"{language_instruction}\n\n{msg.text}"
+
+    response = agent_executor.invoke({"input": modified_input})
+
 
     # ADDED: Store current question
     user_data.setdefault("qa_pairs", []).append({
@@ -233,13 +241,9 @@ def chat_with_model(msg: Message):
     if qa_pairs:
         recent_qa = qa_pairs[-3:]
         formatted_qa = "\n\n".join([f"Q: {pair['question']}\nA: {pair['answer']}" for pair in recent_qa])
-
-        language_instructions = "in English"
-
-        if msg.language == "hi":
-            language_instructions = "in Hindi"
+    
         prompt = f"""
-        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers and from Humans POV and should be {language_instructions}.
+        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers and from Humans POV .
 
         {formatted_qa}
 
