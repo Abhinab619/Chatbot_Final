@@ -184,8 +184,13 @@ def chat_with_model(msg: Message):
         connected_users[user_id] = {
             "first_seen": now,
             "last_active": now,
-            "total_messages": 0
+            "total_messages": 0,
+            "language": msg.language
         }
+    new_lang = msg.language
+    old_lang = connected_users[user_id].get("language")
+    if new_lang != old_lang:
+        connected_users[user_id]["language"] = new_lang
 
     user_data = get_user_memory(user_id)
     memory = user_data["memory"]
@@ -219,10 +224,10 @@ def chat_with_model(msg: Message):
         )
         
 
-    language_instruction = "Please answer in Hindi." if msg.language == "hi" else "Please answer in English."
-    modified_input = f"{language_instruction}\n\n{msg.text}"
+    lang_instruction = "Answer in Hindi." if connected_users[user_id]["language"] == "hi" else "Answer in English."
+    full_input = f"{msg.text}\n\n{lang_instruction}"
 
-    response = agent_executor.invoke({"input": modified_input})
+    response = agent_executor.invoke({"input": full_input})
 
 
     # ADDED: Store current question
