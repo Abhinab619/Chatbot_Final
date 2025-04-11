@@ -50,7 +50,6 @@ app.add_middleware(
 class Message(BaseModel):
     text: str
     user_id : str
-    language: str = "en"
 
 # Absolute paths for embedding storage
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -233,13 +232,9 @@ def chat_with_model(msg: Message):
     if qa_pairs:
         recent_qa = qa_pairs[-3:]
         formatted_qa = "\n\n".join([f"Q: {pair['question']}\nA: {pair['answer']}" for pair in recent_qa])
-
-        language_instructions = "in English"
-
-        if msg.language == "hi":
-            language_instructions = "in Hindi"
+    
         prompt = f"""
-        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers and from Humans POV and should be {language_instructions}.
+        Based on the following recent interactions between the user and the assistant, give three helpful , short and context-aware follow-up questions, related  only to the given answers and from Humans POV .
 
         {formatted_qa}
 
@@ -271,6 +266,17 @@ def chat_with_model(msg: Message):
         "intermediate_steps": response.get("intermediate_steps", []),
         "recommended_question": recommended_question            # ADDED: Return recommended question
     }
+
+@app.get("/dashboard/stats")
+def get_dashboard_stats():
+    return {
+        "total_users": len(connected_users),
+        "total_messages": sum(user["total_messages"] for user in connected_users.values()),
+        "avg_messages_per_user": round(
+            sum(user["total_messages"] for user in connected_users.values()) / len(connected_users), 2
+        ) if connected_users else 0
+    }
+
 
 
 
