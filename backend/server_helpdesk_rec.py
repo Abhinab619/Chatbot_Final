@@ -50,7 +50,6 @@ app.add_middleware(
 class Message(BaseModel):
     text: str
     user_id : str
-    language: str = "en"
 
 # Absolute paths for embedding storage
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -111,14 +110,45 @@ retriever_tool6 = create_retriever_tool(retriever=retriever6,
                                        name="Udyami_Yojna_scheme5_Alpsankhyak",
                                        description="Retrieves relevant information from stored documents summarizing all the information without missing any")
 
+# Tool 1.7 (MMUY)
+vectorstore7 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool7"),
+                     embedding_function=GoogleGenerativeAIEmbeddings(
+                     model="models/text-embedding-004",
+                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+
+retriever7 = vectorstore7.as_retriever(search_type="mmr", search_kwargs={'k': 3, 'lambda_mult': 0.7})
+retriever_tool7 = create_retriever_tool(retriever=retriever7,                           
+                                       name="MMUY",
+                                       description="Retrieves relevant information from stored documents summarizing all the information without missing any")
+
+
+# Tool 1.8 (BLUY)
+vectorstore8 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool8"),
+                     embedding_function=GoogleGenerativeAIEmbeddings(
+                     model="models/text-embedding-004",
+                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+
+retriever8 = vectorstore8.as_retriever(search_type="mmr", search_kwargs={'k': 3, 'lambda_mult': 0.7})
+retriever_tool8 = create_retriever_tool(retriever=retriever8,                           
+                                       name="MMUY",
+                                       description="Retrieves relevant information from stored documents summarizing all the information without missing any")
+
+
 # Direct Gemini Tool
 chat = ChatGoogleGenerativeAI(model="gemini-1.5-pro",
                               google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE")
 
 @tool
 def direct_llm_answer(query: str) -> str:
-    """Directly generates an answer from the LLM."""
-    response = chat.invoke(query)
+    """Directly generates an answer from the LLM and only relevant."""
+
+    prompt = f"""
+    You are an assistant that only answers queries about government schemes of Bihar, India.
+    Do not answer anything unrelated to Bihar schemes. If a question is unrelated, politely inform the user.
+
+    User question: {query}
+    """
+    response = chat.invoke(prompt)
     return response
 
 
@@ -166,10 +196,6 @@ def get_user_memory(user_id: str):
     
     return memory_data if memory_data is not None else {}
 
-
-
-
-
 @app.post("/chat")
 def chat_with_model(msg: Message):
     remove_inactive_users()
@@ -184,13 +210,8 @@ def chat_with_model(msg: Message):
         connected_users[user_id] = {
             "first_seen": now,
             "last_active": now,
-            "total_messages": 0,
-            "language": msg.language
+            "total_messages": 0
         }
-    new_lang = msg.language
-    old_lang = connected_users[user_id].get("language")
-    if new_lang != old_lang:
-        connected_users[user_id]["language"] = new_lang
 
     user_data = get_user_memory(user_id)
     memory = user_data["memory"]
@@ -224,11 +245,7 @@ def chat_with_model(msg: Message):
         )
         
 
-    lang_instruction = "Answer in Hindi." if connected_users[user_id]["language"] == "hi" else "Answer in English."
-    full_input = f"{msg.text}\n\n{lang_instruction}"
-
-    response = agent_executor.invoke({"input": full_input})
-
+    response = agent_executor.invoke({"input": msg.text})
 
     # ADDED: Store current question
     user_data.setdefault("qa_pairs", []).append({
@@ -282,6 +299,9 @@ def chat_with_model(msg: Message):
     }
 
 
+
+#to run : uvicorn backend.server_helpdesk_rec:app --host 0.0.0.0 --port 8000 --reload
+# frontend : http://127.0.0.1:8000/chat
 
 
 # Version 0.2
