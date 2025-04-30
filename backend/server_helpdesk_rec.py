@@ -154,7 +154,7 @@ def direct_llm_answer(query: str) -> str:
 
 
 
-tools = [retriever_tool2, retriever_tool3, retriever_tool4, retriever_tool5, retriever_tool6, direct_llm_answer]
+tools = [retriever_tool2, retriever_tool3, retriever_tool4, retriever_tool5, retriever_tool6, retriever_tool7,retriever_tool8,direct_llm_answer]
 
 chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
 
