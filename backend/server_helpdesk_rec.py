@@ -118,7 +118,7 @@ vectorstore7 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool7"),
 
 retriever7 = vectorstore7.as_retriever(search_type="mmr", search_kwargs={'k': 3, 'lambda_mult': 0.7})
 retriever_tool7 = create_retriever_tool(retriever=retriever7,                           
-                                       name="MMUY",
+                                       name="MMUY (Mukhyamantri Udyami Yojana)",
                                        description="Retrieves relevant information from stored documents summarizing all the information without missing any")
 
 
@@ -130,7 +130,7 @@ vectorstore8 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool8"),
 
 retriever8 = vectorstore8.as_retriever(search_type="mmr", search_kwargs={'k': 3, 'lambda_mult': 0.7})
 retriever_tool8 = create_retriever_tool(retriever=retriever8,                           
-                                       name="MMUY",
+                                       name="BLUY (Bihar Laghu Udyami Yojna)",
                                        description="Retrieves relevant information from stored documents summarizing all the information without missing any")
 
 
