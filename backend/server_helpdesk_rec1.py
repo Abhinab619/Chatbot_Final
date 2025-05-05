@@ -11,7 +11,7 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 import os
 from datetime import datetime, timedelta
 import uuid
-from langdetect import detect
+from langdetect import detect,detect_langs
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
 
@@ -174,8 +174,23 @@ def chat_with_model(msg: Message):
     last_q = connected_users[user_id]["last_qa"]["q"]
     last_a = connected_users[user_id]["last_qa"]["a"]
 
-    detected_language = detect(msg.text)
-    prompt1 = f"Please answer the following question in {detected_language}. User's question: {msg.text}"
+    langs = detect_langs(msg.text)
+    print(langs)
+
+
+
+
+# Filter for only English and Hindi
+    allowed_langs = ['en', 'hi']
+    filtered_langs = [lang for lang in langs if lang.lang in allowed_langs]
+
+# Choose the one with the highest probability
+    if not filtered_langs:
+        prompt1 = f"Please answer the following questions in en. User's question: {msg.text}"
+    else:
+        best_lang = max(filtered_langs, key=lambda x: x.prob).lang
+        lang_map = {'en': 'English', 'hi': 'Hindi'}
+        prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
 
 
     context = ""
@@ -185,6 +200,9 @@ def chat_with_model(msg: Message):
     full_input = f"{prompt1}{context}Current question is: {msg.text}"
 
     
+
+
+
 
 
     agent_executor = AgentExecutor(
