@@ -26,7 +26,7 @@ export default function App() {
         body: JSON.stringify({ text: message, user_id: userId }),
       });
 
-      const data = await response.json();
+      const data = await response.json(); 
 
       if (!userId) {
         setUserId(data.user_id);

@@ -55,6 +55,16 @@ retriever_tool10 = create_retriever_tool(retriever=retriever10,
                                        name="Udyami_Yojna",
                                        description="You are an expert assistant for the Udyami Yojna scheme. Using the information retrieved from your knowledge base, provide complete and accurate answers related to the Mukhyamantri Udyami Yojna, including but not limited to: scheme overview, projects/enterprises included, eligibility criteria, required documents, step-by-step application and selection process, financial assistance and benefits,fund disbursement, training and installment procedures, loan repayment guidelines, and any important conditions or restrictions. Summarize all relevant details concisely without omitting key points.")
 
+# tool_table
+vectorstore11 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool11"),
+                     embedding_function=GoogleGenerativeAIEmbeddings(
+                     model="models/text-embedding-004",
+                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+retriever11 = vectorstore11.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+retriever_tool11 = create_retriever_tool(retriever=retriever11,                           
+                                       name="Udyami_Yojna_Project_list_with_fund",
+                                       description="Use this tool when asked more information about projects to retrieve detailed information about various names, machinery specifications, quantities, production capacity per hour, estimated electricity load, shed preparation cost, cost of machinery, working capital, and total project cost. ")
+
 
 
 
@@ -75,7 +85,7 @@ def direct_llm_answer(query: str) -> str:
     response = chat.invoke(prompt)
     return response
 
-tools = [retriever_tool10, direct_llm_answer]
+tools = [retriever_tool10,retriever_tool11, direct_llm_answer]
 
 chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
 agent = create_tool_calling_agent(llm=chat, tools=tools, prompt=chat_prompt_template)
