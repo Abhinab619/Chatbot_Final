@@ -53,7 +53,7 @@ vectorstore10 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool10"),
 retriever10 = vectorstore10.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool10 = create_retriever_tool(retriever=retriever10,                           
                                        name="Udyami_Yojna",
-                                       description="You are an expert assistant for the Udyami Yojna scheme. Using the information retrieved from your knowledge base, provide complete and accurate answers related to the Mukhyamantri Udyami Yojna, including but not limited to: scheme overview, projects/enterprises included, eligibility criteria(like age and other info.), required documents, step-by-step application and selection process, financial assistance and benefits,fund disbursement, training and installment procedures, loan repayment guidelines, and any important conditions or restrictions. Summarize all relevant details concisely without omitting key points.")
+                                       description="You are an expert assistant for the Udyami Yojna scheme. Using the information retrieved from your knowledge base, provide complete and accurate answers related to the Mukhyamantri Udyami Yojna, including but not limited to: scheme overview, projects/enterprises included, eligibility criteria (and questions like age limit), required documents, step-by-step application and selection process, financial assistance and benefits, fund disbursement, training and installment procedures, loan repayment guidelines, and any important conditions or restrictions. Also, accurately determine whether individuals from specific occupations, backgrounds, or categories (e.g., farmers, students, government employees, etc.) are eligible to apply, providing a clear explanation including any relevant conditions such as caste category, age, educational qualifications, or occupation-based restrictions. Summarize all relevant details concisely without omitting key points.It also deals with questions like if a certain individual can apply")
 
 # tool_table
 vectorstore11 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool11"),
@@ -77,7 +77,8 @@ chat = ChatGoogleGenerativeAI(model="gemini-1.5-pro",
 def direct_llm_answer(query: str) -> str:
     """Directly generates an answer from the LLM and only relevant."""
     prompt = f"""
-    You are an assistant that only answers queries about government schemes of Bihar, India.
+    You are an assistant that only answers queries about government schemes of Bihar, India,
+    and only those queries whose information is not available in other tools.
     Do not answer anything unrelated to Bihar schemes. If a question is unrelated, politely inform the user.
 
     User question: {query}
