@@ -53,7 +53,12 @@ vectorstore001 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool001"
 retriever001 = vectorstore001.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
-                                       description="You are an expert assistant for the Udyami Yojna , You only cotanin basic information about Udyami Yojna and its sub-sections(MMUY(MukyaMantri Udyami Yojna) and BLUY(Bihar Laghu Udyami Yojna)). When asked for specific details on schemes you need to cross-question users and ask them if they are asking in regard to MMUY or BLUY, if user already asked about one unless it is explicitly asked ,dont cross question again and answer in regard to waht user chose")
+                                       description=(
+        "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and basic "
+        "details of the scheme and its two main sub-sections: Mukhyamantri Udyami Yojna (MMUY) and Bihar Laghu Udyami Yojna (BLUY). "
+        "When asked for details about any scheme, you must first ask the user whether they are referring to MMUY or BLUY, unless they have "
+        "already specified one. Once a scheme is identified, continue to provide information relevant only to that scheme unless the user explicitly switches. "
+        "Do not cross-question again unless necessary."))
 
 
 # tool10
