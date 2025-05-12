@@ -45,6 +45,17 @@ EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
 
 
 
+# tool 001
+vectorstore001 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool001"),
+                     embedding_function=GoogleGenerativeAIEmbeddings(
+                     model="models/text-embedding-004",
+                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+retriever001 = vectorstore001.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
+                                       name="Udyami_Yojna_head",
+                                       description="You are an expert assistant for the Udyami Yojna , You only cotanin basic information about Udyami Yojna and its sub-sections(MMUY(MukyaMantri Udyami Yojna) and BLUY(Bihar Laghu Udyami Yojna)). When asked for specific details on schemes you need to cross-question users and ask them if they are asking in regard to MMUY or BLUY, if user already asked about one unless it is explicitly asked ,dont cross question again and answer in regard to waht user chose")
+
+
 # tool10
 vectorstore10 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool10"),
                      embedding_function=GoogleGenerativeAIEmbeddings(
@@ -52,21 +63,38 @@ vectorstore10 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool10"),
                      google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
 retriever10 = vectorstore10.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool10 = create_retriever_tool(retriever=retriever10,                           
-                                       name="Udyami_Yojna",
-                                       description="You are an expert assistant for the Udyami Yojna scheme. Using the information retrieved from your knowledge base, provide complete and accurate answers related to the Mukhyamantri Udyami Yojna, including but not limited to: scheme overview, projects/enterprises included(Only the projects which are explicitly mentioned in the documents are eligible, others are not), eligibility criteria (and questions like age limit), required documents, step-by-step application and selection process, financial assistance and benefits, fund disbursement, training and installment procedures, loan repayment guidelines, and any important conditions or restrictions. Also, accurately determine whether individuals from specific occupations, backgrounds, or categories (e.g., farmers, students, government employees, etc.) are eligible to apply, providing a clear explanation including any relevant conditions such as caste category, age, educational qualifications, or occupation-based restrictions. Summarize all relevant details concisely without omitting key points.It also deals with questions like if a certain individual can apply")
+                                       name="Udyami_Yojna_section1_MMUY",
+                                       description="You are an expert assistant for the Udyami Yojna scheme section1 MMUY. Using the information retrieved from your knowledge base, provide complete and accurate answers related to the Mukhyamantri Udyami Yojna, including but not limited to: scheme overview, projects/enterprises included(Only the projects which are explicitly mentioned in the documents are eligible, others are not), eligibility criteria (and questions like age limit), required documents, step-by-step application and selection process, financial assistance and benefits, fund disbursement, training and installment procedures, loan repayment guidelines, and any important conditions or restrictions. Also, accurately determine whether individuals from specific occupations, backgrounds, or categories (e.g., farmers, students, government employees, etc.) are eligible to apply, providing a clear explanation including any relevant conditions such as caste category, age, educational qualifications, or occupation-based restrictions. Summarize all relevant details concisely without omitting key points.It also deals with questions like if a certain individual can apply")
 
-# tool_table
+# tool_table / tool11
 vectorstore11 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool11"),
                      embedding_function=GoogleGenerativeAIEmbeddings(
                      model="models/text-embedding-004",
                      google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
 retriever11 = vectorstore11.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool11 = create_retriever_tool(retriever=retriever11,                           
-                                       name="Udyami_Yojna_Project_list_with_fund",
+                                       name="MMUY_Project_list_with_fund",
                                        description="Use this tool when asked more information about projects to retrieve detailed information about various names, machinery specifications, quantities, production capacity per hour, estimated electricity load, shed preparation cost, cost of machinery, working capital, and total project cost. ")
 
+# tool12
+vectorstore12 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool12"),
+                     embedding_function=GoogleGenerativeAIEmbeddings(
+                     model="models/text-embedding-004",
+                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+retriever12 = vectorstore12.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+retriever_tool12 = create_retriever_tool(retriever=retriever12,                           
+                                       name="helpline",
+                                       description= "Use This tool when contact information regarding an issue is asked, or when question asked is out of scope and the question falls under the given Sections/domains given in this document. ")
 
-
+# tool13
+vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
+                     embedding_function=GoogleGenerativeAIEmbeddings(
+                     model="models/text-embedding-004",
+                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+retriever13 = vectorstore13.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+retriever_tool13 = create_retriever_tool(retriever=retriever13,                           
+                                       name="Udyami_Yojna_section2_BLUY",
+                                       description= "You are an expert assistant for the Udyami Yojna scheme section2 BLUY.Only the projects/List of Activities which are explicitly mentioned in the documents are eligible, others are not")
 
 
 # Direct Gemini Tool (tool 9)
@@ -86,7 +114,7 @@ def direct_llm_answer(query: str) -> str:
     response = chat.invoke(prompt)
     return response
 
-tools = [retriever_tool10,retriever_tool11, direct_llm_answer]
+tools = [retriever_tool001, retriever_tool10, retriever_tool11, retriever_tool12, retriever_tool13, direct_llm_answer]
 
 chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
 agent = create_tool_calling_agent(llm=chat, tools=tools, prompt=chat_prompt_template)
