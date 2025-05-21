@@ -11,7 +11,9 @@ from langchain.agents import create_tool_calling_agent, AgentExecutor
 import os
 from datetime import datetime, timedelta
 import uuid
-from langdetect import detect,detect_langs
+from langdetect import detect_langs
+from langchain.memory import ConversationBufferWindowMemory
+
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
 
@@ -57,7 +59,7 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
         "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and basic "
         "details of the scheme and its two main sub-sections: Mukhyamantri Udyami Yojna (MMUY) and Bihar Laghu Udyami Yojna (BLUY). "
         "When asked for details about any scheme, you must first ask the user whether they are referring to MMUY or BLUY, unless they have "
-        "already specified one. Once a scheme is identified, continue to provide information relevant only to that scheme unless the user explicitly switches. "
+        "already specified one, in that case directly invoke its agents. Once a scheme is identified, continue to provide information relevant only to that scheme unless the user explicitly switches. "
         "Do not cross-question again unless necessary."))
 
 
@@ -79,7 +81,7 @@ vectorstore11 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool11"),
 retriever11 = vectorstore11.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool11 = create_retriever_tool(retriever=retriever11,                           
                                        name="MMUY_Project_list_with_fund",
-                                       description="Use this tool when asked more information about projects to retrieve detailed information about various names, machinery specifications, quantities, production capacity per hour, estimated electricity load, shed preparation cost, cost of machinery, working capital, and total project cost. ")
+                                       description="Use this tool when asked more information about projects to retrieve detailed information about various names, machinery specifications, quantities, production capacity per hour, estimated electricity load, shed preparation cost, cost of machinery, working capital, and total project cost.A project/industry/business is available ")
 
 # tool12
 vectorstore12 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool12"),
@@ -103,7 +105,7 @@ retriever_tool13 = create_retriever_tool(retriever=retriever13,
 
 
 # Direct Gemini Tool (tool 9)
-chat = ChatGoogleGenerativeAI(model="gemini-1.5-pro",
+chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
                               google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE")
 
 @tool
@@ -119,7 +121,7 @@ def direct_llm_answer(query: str) -> str:
     response = chat.invoke(prompt)
     return response
 
-tools = [retriever_tool001, retriever_tool10, retriever_tool11, retriever_tool12, retriever_tool13, direct_llm_answer]
+tools = [retriever_tool001, retriever_tool10, retriever_tool11, retriever_tool12, retriever_tool13]
 
 chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
 agent = create_tool_calling_agent(llm=chat, tools=tools, prompt=chat_prompt_template)
@@ -140,7 +142,7 @@ def chat_with_model(msg: Message):
             "first_seen": now,
             "last_active": now,
             "total_messages": 0,
-            "last_qa" : {"q" : "", "a" : "" }
+            "memory": ConversationBufferWindowMemory(k=4, return_messages=True, memory_key="chat_history")
         }
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -148,8 +150,8 @@ def chat_with_model(msg: Message):
     connected_users[user_id]["total_messages"] += 1
 
 
-    last_q = connected_users[user_id]["last_qa"]["q"]
-    last_a = connected_users[user_id]["last_qa"]["a"]
+    
+
 
     langs = detect_langs(msg.text)
     print(langs)
@@ -170,11 +172,10 @@ def chat_with_model(msg: Message):
         prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
 
 
-    context = ""
-    if last_q and last_a:
-        context = f"Previous question asked was : {last_q}\n and its answer was: {last_a}\n"
+    
 
-    full_input = f"{prompt1}{context}Current question is: {msg.text}, Keep the context of previous questions in mind, but dont use their answers"
+
+
 
     
 
@@ -186,23 +187,24 @@ def chat_with_model(msg: Message):
         agent=agent,
         tools=tools,
         verbose=True,
+        memory=connected_users[user_id]["memory"],
         return_intermediate_steps=True,
     )
 
-    print(f"Last Question : {connected_users[user_id]['last_qa']['q']} \n \n Last Answer :{connected_users[user_id]['last_qa']['a']} ")
+    
 
-    response = agent_executor.invoke({"input": full_input})                                   # Final Answer
+    response = agent_executor.invoke({"input": msg.text})                                   # Final Answer
 
     steps = response.get("intermediate_steps", [])
-    print("\n\n\nSTEPS ::::: ",steps)    
-
-
-    connected_users[user_id]["last_qa"] = {
-    "q": msg.text,
-    "a": response.get("output", "")
-}
     
-    print(f"Last Question : {connected_users[user_id]['last_qa']['q']} \n \n Last Answer :{connected_users[user_id]['last_qa']['a']} ")
+    
+
+
+    
+
+    memory = connected_users[user_id]["memory"]
+    print(memory.chat_memory.messages)
+
     
 
 
