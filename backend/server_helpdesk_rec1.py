@@ -91,7 +91,7 @@ vectorstore12 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool12"),
 retriever12 = vectorstore12.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool12 = create_retriever_tool(retriever=retriever12,                           
                                        name="helpline",
-                                       description= "Use This tool when contact information regarding an issue is asked, or when question asked is out of scope and the question falls under the given Sections/domains given in this document. ")
+                                       description= "Use This tool when question/query asked is out of scope and the question falls under the given Sections/domains given in this document. ")
 
 # tool13
 vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
@@ -108,18 +108,22 @@ retriever_tool13 = create_retriever_tool(retriever=retriever13,
 chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
                               google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE")
 
-@tool
-def direct_llm_answer(query: str) -> str:
-    """Directly generates an answer from the LLM and only relevant."""
-    prompt = f"""
-    You are an assistant that only answers queries about government schemes of Bihar, India,
-    and only those queries whose information is not available in other tools.
-    Do not answer anything unrelated to Bihar schemes. If a question is unrelated, politely inform the user.
 
-    User question: {query}
-    """
-    response = chat.invoke(prompt)
-    return response
+
+# @tool
+# def direct_llm_answer(query: str) -> str:
+#     """Directly generates an answer from the LLM and only relevant."""
+#     prompt = f"""
+#     You are an assistant that only answers queries about government schemes of Bihar, India,
+#     and only those queries whose information is not available in other tools.
+#     Do not answer anything unrelated to Bihar schemes. If a question is unrelated, politely inform the user.
+
+#     User question: {query}
+#     """
+#     response = chat.invoke(prompt)
+#     return response
+
+    
 
 tools = [retriever_tool001, retriever_tool10, retriever_tool11, retriever_tool12, retriever_tool13]
 
