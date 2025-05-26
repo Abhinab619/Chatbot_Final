@@ -98,32 +98,29 @@ def helpline_query_logger(user_input: str) -> str:
     app_id_match = re.search(r"(?:application\s*ID\s*[:\-]?\s*)(\w+)", user_input, re.IGNORECASE)
     mob_no_match = re.search(r"(?:mobile\s*number\s*[:\-]?\s*)?(?:\+91|91)?\s*([6-9]\d{9})", user_input)
 
-
     if not name_match or (not app_id_match and not mob_no_match):
-        return "Please provide your name and application ID in the format: 'Name: Your Name, Application ID: 12345'/Mobile Number : 0612061200 "
+        return "Please provide your name and application ID in the format: 'Name: Your Name, Application ID: 12345' / Mobile Number : 0612061200"
 
     name = name_match.group(1).strip()
     app_id = app_id_match.group(1).strip() if app_id_match else "N/A"
     mob_no = mob_no_match.group(1).strip() if mob_no_match else "N/A"
 
-    # File path
     excel_path = os.path.join(BASE_DIR, "helpline_queries_v2.xlsx")
 
-    # Load or create workbook
     try:
         wb = load_workbook(excel_path)
         ws = wb.active
     except FileNotFoundError:
         wb = Workbook()
         ws = wb.active
-        ws.append(["Timestamp", "Name", "Application ID","Mobile Number", "Query"])
+        ws.append(["Timestamp", "Name", "Application ID", "Mobile Number", "Query"])
 
-    # Write data
-    ws.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name, app_id, mob_no, user_input])
-    wb.save(excel_path)
+    
+    new_row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name, app_id, mob_no, user_input]
+    ws.append(new_row)
+    wb.save(excel_path)  
 
-    return f"Thanks {name}. Your query has been logged with Application ID: {app_id}, or mobile number{mob_no}. We will get back to you soon."
-
+    return f"Thanks {name}. Your query has been logged with Application ID: {app_id}, or mobile number {mob_no}. We will get back to you soon."
 
 # tool13
 vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
@@ -232,7 +229,25 @@ def chat_with_model(msg: Message):
     response = agent_executor.invoke({"input": msg.text})                                   # Final Answer
 
     steps = response.get("intermediate_steps", [])
-    
+
+    # Check if helpline logger tool was triggered
+    # query_logged = False
+    # logged_message = ""
+
+    # for step in steps:
+    #     if hasattr(step[0], 'tool') and step[0].tool == "helpline_query_logger":
+    #         query_logged = True
+    #         logged_message = step[1]  # The output of the tool
+    #         break
+    query_logged = False
+    logged_message = None
+
+    for step in steps:
+        if isinstance(step, tuple) and len(step) == 2 and hasattr(step[0], 'tool'):
+            if step[0].tool == "helpline_query_logger":
+                query_logged = True
+                logged_message = step[1]
+                break
     
 
 
@@ -260,7 +275,9 @@ def chat_with_model(msg: Message):
         "user_id": user_id,
         "response": response.get("output", "No response generated"),
         "intermediate_steps": response.get("intermediate_steps", []),
-        "recommended_question": recommended_question
+        "recommended_question": recommended_question,
+        "query_logged": query_logged,
+        "logged_message": logged_message
     }
 
     
