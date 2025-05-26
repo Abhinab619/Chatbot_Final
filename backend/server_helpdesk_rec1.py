@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 import uuid
 from langdetect import detect_langs
 from langchain.memory import ConversationBufferWindowMemory
+from openpyxl import Workbook, load_workbook
+import re
 
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
@@ -84,14 +86,44 @@ retriever_tool11 = create_retriever_tool(retriever=retriever11,
                                        description="Use this tool when asked more information about projects to retrieve detailed information about various names, machinery specifications, quantities, production capacity per hour, estimated electricity load, shed preparation cost, cost of machinery, working capital, and total project cost.A project/industry/business is available ")
 
 # tool12
-vectorstore12 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool12"),
-                     embedding_function=GoogleGenerativeAIEmbeddings(
-                     model="models/text-embedding-004",
-                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
-retriever12 = vectorstore12.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
-retriever_tool12 = create_retriever_tool(retriever=retriever12,                           
-                                       name="helpline",
-                                       description= "Use This tool when question/query asked is out of scope and the question falls under the given Sections/domains given in this document. ")
+@tool
+def helpline_query_logger(user_input: str) -> str:
+    """
+    If query is out of scope or user asks for further assistance 
+    then this tool Asks for user's name and application ID if not provided and logs them into an Excel sheet along with the query,
+    If application ID is not available ask for mobile number.
+    """
+    # Check if name and application ID are in the input
+    name_match = re.search(r"(?:name\s*[:\-]?\s*)([A-Za-z\s]+)", user_input, re.IGNORECASE)
+    app_id_match = re.search(r"(?:application\s*ID\s*[:\-]?\s*)(\w+)", user_input, re.IGNORECASE)
+    mob_no_match = re.search(r"(?:mobile\s*number\s*[:\-]?\s*)?(?:\+91|91)?\s*([6-9]\d{9})", user_input)
+
+
+    if not name_match or (not app_id_match and not mob_no_match):
+        return "Please provide your name and application ID in the format: 'Name: Your Name, Application ID: 12345'/Mobile Number : 0612061200 "
+
+    name = name_match.group(1).strip()
+    app_id = app_id_match.group(1).strip() if app_id_match else "N/A"
+    mob_no = mob_no_match.group(1).strip() if mob_no_match else "N/A"
+
+    # File path
+    excel_path = os.path.join(BASE_DIR, "helpline_queries_v2.xlsx")
+
+    # Load or create workbook
+    try:
+        wb = load_workbook(excel_path)
+        ws = wb.active
+    except FileNotFoundError:
+        wb = Workbook()
+        ws = wb.active
+        ws.append(["Timestamp", "Name", "Application ID","Mobile Number", "Query"])
+
+    # Write data
+    ws.append([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name, app_id, mob_no, user_input])
+    wb.save(excel_path)
+
+    return f"Thanks {name}. Your query has been logged with Application ID: {app_id}, or mobile number{mob_no}. We will get back to you soon."
+
 
 # tool13
 vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
@@ -125,7 +157,7 @@ chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
 
     
 
-tools = [retriever_tool001, retriever_tool10, retriever_tool11, retriever_tool12, retriever_tool13]
+tools = [retriever_tool001, retriever_tool10, retriever_tool11, helpline_query_logger, retriever_tool13]
 
 chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
 agent = create_tool_calling_agent(llm=chat, tools=tools, prompt=chat_prompt_template)
