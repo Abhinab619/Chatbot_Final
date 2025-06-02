@@ -53,7 +53,7 @@ EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
 vectorstore001 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool001"),
                      embedding_function=GoogleGenerativeAIEmbeddings(
                      model="models/text-embedding-004",
-                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
 retriever001 = vectorstore001.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
@@ -69,7 +69,7 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
 vectorstore10 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool10"),
                      embedding_function=GoogleGenerativeAIEmbeddings(
                      model="models/text-embedding-004",
-                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
 retriever10 = vectorstore10.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool10 = create_retriever_tool(retriever=retriever10,                           
                                        name="Udyami_Yojna_section1_MMUY",
@@ -79,7 +79,7 @@ retriever_tool10 = create_retriever_tool(retriever=retriever10,
 vectorstore11 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool11"),
                      embedding_function=GoogleGenerativeAIEmbeddings(
                      model="models/text-embedding-004",
-                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
 retriever11 = vectorstore11.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool11 = create_retriever_tool(retriever=retriever11,                           
                                        name="MMUY_Project_list_with_fund",
@@ -126,7 +126,7 @@ def helpline_query_logger(user_input: str) -> str:
 vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
                      embedding_function=GoogleGenerativeAIEmbeddings(
                      model="models/text-embedding-004",
-                     google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE"))
+                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
 retriever13 = vectorstore13.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool13 = create_retriever_tool(retriever=retriever13,                           
                                        name="Udyami_Yojna_section2_BLUY",
@@ -135,7 +135,7 @@ retriever_tool13 = create_retriever_tool(retriever=retriever13,
 
 # Direct Gemini Tool (tool 9)
 chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
-                              google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE")
+                              google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg")
 
 
 
