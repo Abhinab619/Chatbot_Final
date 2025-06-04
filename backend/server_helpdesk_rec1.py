@@ -87,7 +87,7 @@ retriever_tool11 = create_retriever_tool(retriever=retriever11,
 
 # tool12
 @tool
-def helpline_query_logger(user_input: str) -> str:
+def helpline_query_logger(user_input: str) -> dict:
     """
     If query is out of scope or user asks for further assistance 
     then this tool Asks for user's name and application ID if not provided and logs them into an Excel sheet along with the query,
@@ -99,8 +99,14 @@ def helpline_query_logger(user_input: str) -> str:
     mob_no_match = re.search(r"(?:mobile\s*number\s*[:\-]?\s*)?(?:\+91|91)?\s*([6-9]\d{9})", user_input)
 
     if not name_match or (not app_id_match and not mob_no_match):
-        return "Please provide your name and application ID in the format: 'Name: Your Name, Application ID: 12345' / Mobile Number : 0612061200"
-
+         return {
+            "message": "Please provide your name and application ID in the format: 'Name: Your Name, Application ID: 12345' / Mobile Number : 0612061200",
+            "name": None,
+            "application_id": None,
+            "mobile_number": None,
+            "query": user_input
+        }
+    
     name = name_match.group(1).strip()
     app_id = app_id_match.group(1).strip() if app_id_match else "N/A"
     mob_no = mob_no_match.group(1).strip() if mob_no_match else "N/A"
@@ -120,7 +126,14 @@ def helpline_query_logger(user_input: str) -> str:
     ws.append(new_row)
     wb.save(excel_path)  
 
-    return f"Thanks {name}. Your query has been logged with Application ID: {app_id}, or mobile number {mob_no}. We will get back to you soon."
+    return {
+        "message": f"Thanks {name}. Your query has been logged with Application ID: {app_id}, or mobile number {mob_no}. We will get back to you soon.",
+        "name": name,
+        "application_id": app_id,
+        "mobile_number": mob_no,
+        "query": user_input
+    }
+
 
 # tool13
 vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
@@ -241,12 +254,14 @@ def chat_with_model(msg: Message):
     #         break
     query_logged = False
     logged_message = None
+    logged_data = None
 
     for step in steps:
         if isinstance(step, tuple) and len(step) == 2 and hasattr(step[0], 'tool'):
             if step[0].tool == "helpline_query_logger":
                 query_logged = True
                 logged_message = step[1]
+                logged_data = step[1]
                 break
     
 
@@ -277,7 +292,11 @@ def chat_with_model(msg: Message):
         "intermediate_steps": response.get("intermediate_steps", []),
         "recommended_question": recommended_question,
         "query_logged": query_logged,
-        "logged_message": logged_message
+        "logged_message": logged_data.get("message") if logged_data else None,
+        "logged_name": logged_data.get("name") if logged_data else None,
+        "logged_application_id": logged_data.get("application_id") if logged_data else None,
+        "logged_mobile_number": logged_data.get("mobile_number") if logged_data else None,
+        "logged_query": logged_data.get("query") if logged_data else None
     }
 
     
