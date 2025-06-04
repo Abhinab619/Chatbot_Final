@@ -15,7 +15,9 @@ from langdetect import detect_langs
 from langchain.memory import ConversationBufferWindowMemory
 from openpyxl import Workbook, load_workbook
 import re
-
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
+import pandas as pd
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
 
@@ -43,6 +45,46 @@ app.add_middleware(
 class Message(BaseModel):
     text: str
     user_id : str
+
+
+
+
+# models/helpline_schema.py
+from pydantic import BaseModel
+from typing import Optional
+
+class HelplineLog(BaseModel):
+    name: Optional[str]
+    application_id: Optional[str]
+    mobile_number: Optional[str]
+    query: str
+
+
+# Step 1: Parser and prompt setup
+log_parser = PydanticOutputParser(pydantic_object=HelplineLog)
+format_instructions = log_parser.get_format_instructions()
+
+prompt = PromptTemplate(
+    template="""
+Extract the following information from the user input:
+- Name
+- Application ID
+- Mobile Number
+
+
+Only extract what is present. Leave missing fields as null.
+User Query: {user_input}
+
+{format_instructions}
+""",
+    input_variables=["user_input"],
+    partial_variables={"format_instructions": format_instructions}
+)
+
+
+
+
+
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
@@ -85,54 +127,99 @@ retriever_tool11 = create_retriever_tool(retriever=retriever11,
                                        name="MMUY_Project_list_with_fund",
                                        description="Use this tool when asked more information about projects to retrieve detailed information about various names, machinery specifications, quantities, production capacity per hour, estimated electricity load, shed preparation cost, cost of machinery, working capital, and total project cost.A project/industry/business is available ")
 
+
+
+
+# Direct Gemini Tool (tool 9)
+chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
+                              google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg")
 # tool12
+
 @tool
-def helpline_query_logger(user_input: str) -> dict:
+def helpline_query_logger(text: str ) -> str:
     """
     If query is out of scope or user asks for further assistance 
     then this tool Asks for user's name and application ID if not provided and logs them into an Excel sheet along with the query,
     If application ID is not available ask for mobile number.
+    Asks for missing info and only logs to Excel once all required data is collected.
     """
-    # Check if name and application ID are in the input
-    name_match = re.search(r"(?:name\s*[:\-]?\s*)([A-Za-z\s]+)", user_input, re.IGNORECASE)
-    app_id_match = re.search(r"(?:application\s*ID\s*[:\-]?\s*)(\w+)", user_input, re.IGNORECASE)
-    mob_no_match = re.search(r"(?:mobile\s*number\s*[:\-]?\s*)?(?:\+91|91)?\s*([6-9]\d{9})", user_input)
-
-    if not name_match or (not app_id_match and not mob_no_match):
-         return {
-            "message": "Please provide your name and application ID in the format: 'Name: Your Name, Application ID: 12345' / Mobile Number : 0612061200",
-            "name": None,
-            "application_id": None,
-            "mobile_number": None,
-            "query": user_input
-        }
-    
-    name = name_match.group(1).strip()
-    app_id = app_id_match.group(1).strip() if app_id_match else "N/A"
-    mob_no = mob_no_match.group(1).strip() if mob_no_match else "N/A"
-
-    excel_path = os.path.join(BASE_DIR, "helpline_queries_v2.xlsx")
-
+    global current_user_id
+    user_id = current_user_id
+    if not user_id or user_id not in connected_users:
+        return {"query_logged": False, "error": "Invalid or missing user_id"}
     try:
-        wb = load_workbook(excel_path)
-        ws = wb.active
-    except FileNotFoundError:
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["Timestamp", "Name", "Application ID", "Mobile Number", "Query"])
+        chain = prompt | chat | log_parser
+        result: HelplineLog = chain.invoke({"user_input": text})
+        
+        # Get buffer
+        buffer = connected_users[user_id].get("helpline_log_buffer", {})
+        
+        # Update buffer
+        if result.name:
+            buffer["Name"] = result.name
+        if result.application_id:
+            buffer["Application ID"] = result.application_id
+        if result.mobile_number:
+            buffer["Mobile Number"] = result.mobile_number
+        if result.query:
+            buffer["Query"] = result.query
+        
+        # Save back buffer
+        connected_users[user_id]["helpline_log_buffer"] = buffer
 
-    
-    new_row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), name, app_id, mob_no, user_input]
-    ws.append(new_row)
-    wb.save(excel_path)  
+        # Check if all required data is present
+        if buffer.get("Name") and (buffer.get("Application ID") or buffer.get("Mobile Number")) and buffer.get("Query"):
+            row = {
+                "Timestamp": datetime.now().isoformat(),
+                "Name": buffer["Name"],
+                "Application ID": buffer.get("Application ID"),
+                "Mobile Number": buffer.get("Mobile Number"),
+                "Query": buffer["Query"],
+            }
 
-    return {
-        "message": f"Thanks {name}. Your query has been logged with Application ID: {app_id}, or mobile number {mob_no}. We will get back to you soon.",
-        "name": name,
-        "application_id": app_id,
-        "mobile_number": mob_no,
-        "query": user_input
-    }
+            log_path = "helpline_log.xlsx"
+            if os.path.exists(log_path):
+                df = pd.read_excel(log_path)
+            else:
+                df = pd.DataFrame(columns=row.keys())
+
+            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+            df.to_excel(log_path, index=False)
+
+            # Clear the buffer
+            connected_users[user_id]["helpline_log_buffer"] = {}
+
+            return {
+                "query_logged": True,
+                "logged_name": row["Name"],
+                "logged_application_id": row["Application ID"],
+                "logged_mobile_number": row["Mobile Number"],
+                "logged_query": row["Query"],
+                "logged_timestamp": row["Timestamp"],
+                "status": "Successfully logged"
+            }
+        else:
+            missing = []
+            if not buffer.get("Name"):
+                missing.append("Name")
+            if not (buffer.get("Application ID") or buffer.get("Mobile Number")):
+                missing.append("Application ID or Mobile Number")
+            if not buffer.get("Query"):
+                missing.append("Query")
+            
+            return {
+                "query_logged": False,
+                "status": "Waiting for more information",
+                "missing_fields": missing,
+                "buffer": buffer
+            }
+
+    except Exception as e:
+        return {
+            "query_logged": False,
+            "error": str(e)
+        }
+ 
 
 
 # tool13
@@ -146,9 +233,7 @@ retriever_tool13 = create_retriever_tool(retriever=retriever13,
                                        description= "You are an expert assistant for the Udyami Yojna scheme section2 BLUY.Only the projects/List of Activities which are explicitly mentioned in the documents are eligible, others are not")
 
 
-# Direct Gemini Tool (tool 9)
-chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
-                              google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg")
+
 
 
 
@@ -173,14 +258,17 @@ chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
 agent = create_tool_calling_agent(llm=chat, tools=tools, prompt=chat_prompt_template)
 
 connected_users = {}
-
+current_user_id = None  # global variable
 @app.post("/chat")
 def chat_with_model(msg: Message):
+    global current_user_id
     remove_inactive_users()
     if not msg.user_id or not msg.user_id.strip():
         user_id = generate_user_id()
     else:
         user_id = msg.user_id.strip()
+
+    current_user_id = user_id
 
     if user_id not in connected_users:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -188,7 +276,8 @@ def chat_with_model(msg: Message):
             "first_seen": now,
             "last_active": now,
             "total_messages": 0,
-            "memory": ConversationBufferWindowMemory(k=4, return_messages=True, memory_key="chat_history")
+            "memory": ConversationBufferWindowMemory(k=4, return_messages=True, memory_key="chat_history"),
+            "helpline_log_buffer": {}
         }
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -252,17 +341,11 @@ def chat_with_model(msg: Message):
     #         query_logged = True
     #         logged_message = step[1]  # The output of the tool
     #         break
-    query_logged = False
-    logged_message = None
-    logged_data = None
-
-    for step in steps:
-        if isinstance(step, tuple) and len(step) == 2 and hasattr(step[0], 'tool'):
-            if step[0].tool == "helpline_query_logger":
-                query_logged = True
-                logged_message = step[1]
-                logged_data = step[1]
-                break
+    helpline_data = None
+    for step in response.get("intermediate_steps", []):
+        if hasattr(step[0], 'tool') and step[0].tool == "helpline_query_logger":
+            helpline_data = step[1]  # This is the dict returned from the tool
+            break
     
 
 
@@ -291,12 +374,8 @@ def chat_with_model(msg: Message):
         "response": response.get("output", "No response generated"),
         "intermediate_steps": response.get("intermediate_steps", []),
         "recommended_question": recommended_question,
-        "query_logged": query_logged,
-        "logged_message": logged_data.get("message") if logged_data else None,
-        "logged_name": logged_data.get("name") if logged_data else None,
-        "logged_application_id": logged_data.get("application_id") if logged_data else None,
-        "logged_mobile_number": logged_data.get("mobile_number") if logged_data else None,
-        "logged_query": logged_data.get("query") if logged_data else None
+        "helpline_log": helpline_data
+        
     }
 
     
