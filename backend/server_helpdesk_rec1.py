@@ -1,7 +1,6 @@
 from fastapi import FastAPI 
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-from langchain_community.vectorstores import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.tools.retriever import create_retriever_tool
 from langchain.tools import tool
@@ -18,6 +17,7 @@ import re
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 import pandas as pd
+from langchain_community.vectorstores import FAISS
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
 
@@ -92,36 +92,52 @@ EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
 
 
 # tool 001
-vectorstore001 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool001"),
-                     embedding_function=GoogleGenerativeAIEmbeddings(
-                     model="models/text-embedding-004",
-                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
-retriever001 = vectorstore001.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+vectorstore001 = FAISS.load_local(
+    folder_path=os.path.join(EMBEDDINGS_DIR, "tool001"),
+    embeddings=GoogleGenerativeAIEmbeddings(
+        model="models/text-embedding-004",
+        google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"
+    ),
+    index_name="index",  # If your FAISS index filename is `index.faiss`
+    allow_dangerous_deserialization=True  # required if index was saved with pickle
+)
+retriever001 = vectorstore001.as_retriever(search_type="similarity", search_kwargs={'k': 20})
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
                                        description=(
-        "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and basic "
-        "details of the scheme and its two main sub-sections: Mukhyamantri Udyami Yojna (MMUY) and Bihar Laghu Udyami Yojna (BLUY). "
-        "When asked for details about any scheme, you must first ask the user whether they are referring to MMUY or BLUY, unless they have "
-        "already specified one, in that case directly invoke its agents. Once a scheme is identified, continue to provide information relevant only to that scheme unless the user explicitly switches. "
-        "Do not cross-question again unless necessary."))
+        "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and its two sub-schemes. "
+        "If a user's question does not clearly indicate which sub-scheme they are referring to, always ask a clarifying question first. "
+        "Do not assume or guess. Ask: 'Could you please clarify which sub-scheme you're referring to under Udyami Yojna? There are two with different rules.' "
+        "Once clarified, provide an appropriate response based on the available general knowledge."
+        ))
+
 
 
 # tool10
-vectorstore10 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool10"),
-                     embedding_function=GoogleGenerativeAIEmbeddings(
-                     model="models/text-embedding-004",
-                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
-retriever10 = vectorstore10.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+vectorstore10 = FAISS.load_local(
+    folder_path=os.path.join(EMBEDDINGS_DIR, "tool10"),
+    embeddings=GoogleGenerativeAIEmbeddings(
+        model="models/text-embedding-004",
+        google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"
+    ),
+    index_name="index",  # If your FAISS index filename is `index.faiss`
+    allow_dangerous_deserialization=True  # required if index was saved with pickle
+)
+retriever10 = vectorstore10.as_retriever(search_type="similarity", search_kwargs={'k': 20})
 retriever_tool10 = create_retriever_tool(retriever=retriever10,                           
                                        name="Udyami_Yojna_section1_MMUY",
                                        description="You are an expert assistant for the Udyami Yojna scheme section1 MMUY. Using the information retrieved from your knowledge base, provide complete and accurate answers related to the Mukhyamantri Udyami Yojna, including but not limited to: scheme overview, projects/enterprises included(Only the projects which are explicitly mentioned in the documents are eligible, others are not), eligibility criteria (and questions like age limit), required documents, step-by-step application and selection process, financial assistance and benefits, fund disbursement, training and installment procedures, loan repayment guidelines, and any important conditions or restrictions. Also, accurately determine whether individuals from specific occupations, backgrounds, or categories (e.g., farmers, students, government employees, etc.) are eligible to apply, providing a clear explanation including any relevant conditions such as caste category, age, educational qualifications, or occupation-based restrictions. Summarize all relevant details concisely without omitting key points.It also deals with questions like if a certain individual can apply. List the names in a list format.")
 
 # tool_table / tool11
-vectorstore11 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool11"),
-                     embedding_function=GoogleGenerativeAIEmbeddings(
-                     model="models/text-embedding-004",
-                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
+vectorstore11 = FAISS.load_local(
+    folder_path=os.path.join(EMBEDDINGS_DIR, "tool11"),
+    embeddings=GoogleGenerativeAIEmbeddings(
+        model="models/text-embedding-004",
+        google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"
+    ),
+    index_name="index",  # If your FAISS index filename is `index.faiss`
+    allow_dangerous_deserialization=True  # required if index was saved with pickle
+)
 retriever11 = vectorstore11.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
 retriever_tool11 = create_retriever_tool(retriever=retriever11,                           
                                        name="MMUY_Project_list_with_fund",
@@ -132,7 +148,9 @@ retriever_tool11 = create_retriever_tool(retriever=retriever11,
 
 # Direct Gemini Tool (tool 9)
 chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
-                              google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg")
+                              google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg",
+                              temperature=0,
+                              top_k=1)
 # tool12
 
 @tool
@@ -223,11 +241,16 @@ def helpline_query_logger(text: str ) -> str:
 
 
 # tool13
-vectorstore13 = Chroma(persist_directory=os.path.join(EMBEDDINGS_DIR, "tool13"),
-                     embedding_function=GoogleGenerativeAIEmbeddings(
-                     model="models/text-embedding-004",
-                     google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"))
-retriever13 = vectorstore13.as_retriever(search_type="mmr", search_kwargs={'k': 5, 'lambda_mult': 0.7})
+vectorstore13 = FAISS.load_local(
+    folder_path=os.path.join(EMBEDDINGS_DIR, "tool13"),
+    embeddings=GoogleGenerativeAIEmbeddings(
+        model="models/text-embedding-004",
+        google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg"
+    ),
+    index_name="index",  # If your FAISS index filename is `index.faiss`
+    allow_dangerous_deserialization=True  # required if index was saved with pickle
+)
+retriever13 = vectorstore13.as_retriever(search_type="similarity", search_kwargs={'k': 20})
 retriever_tool13 = create_retriever_tool(retriever=retriever13,                           
                                        name="Udyami_Yojna_section2_BLUY",
                                        description= "You are an expert assistant for the Udyami Yojna scheme section2 BLUY.Only the projects/List of Activities which are explicitly mentioned in the documents are eligible, others are not")
@@ -252,10 +275,32 @@ retriever_tool13 = create_retriever_tool(retriever=retriever13,
 
     
 
-tools = [retriever_tool001, retriever_tool10, retriever_tool11, helpline_query_logger, retriever_tool13]
+tools = [ retriever_tool001, retriever_tool10, retriever_tool11, helpline_query_logger, retriever_tool13]
 
-chat_prompt_template = hub.pull("hwchase17/openai-tools-agent")
-agent = create_tool_calling_agent(llm=chat, tools=tools, prompt=chat_prompt_template)
+
+AGENT_INSTRUCTIONS = """
+You are a helpful assistant for the Udyami Yojna scheme.
+
+**Important: You must NOT answer questions directly from your memory or LLM knowledge.**
+
+You MUST always invoke the appropriate tool to answer the user queries.
+
+Use of Memory is only for remembering the previous question and its context which can be refferred for answering the next question
+"""
+
+agent_prompt_template = PromptTemplate(
+    input_variables=["input", "agent_scratchpad", "chat_history"],
+    template=AGENT_INSTRUCTIONS + "\n\nChat History:\n{chat_history}\n\nUser Input: {input}\n{agent_scratchpad}",
+)
+
+
+from langchain.agents import initialize_agent, AgentType
+
+agent = create_tool_calling_agent(
+    llm=chat,
+    tools=tools,
+    prompt=agent_prompt_template
+)
 
 connected_users = {}
 current_user_id = None  # global variable

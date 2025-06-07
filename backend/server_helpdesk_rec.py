@@ -136,7 +136,9 @@ retriever_tool8 = create_retriever_tool(retriever=retriever8,
 
 # Direct Gemini Tool
 chat = ChatGoogleGenerativeAI(model="gemini-1.5-pro",
-                              google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE")
+                              google_api_key="AIzaSyBgdymDNQMdnSEad-xYapzh1hS3F6wmxfE",
+                              temperature=0.2,                    # More deterministic
+                              top_p=0.8)                        # Limits randomness)
 
 @tool
 def direct_llm_answer(query: str) -> str:
