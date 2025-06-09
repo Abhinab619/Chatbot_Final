@@ -106,8 +106,8 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
                                        name="Udyami_Yojna_head",
                                        description=(
         "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and its two sub-schemes. "
-        "If a user's question does not clearly indicate which sub-scheme they are referring to, always ask a clarifying question first. "
-        "Do not assume or guess. Ask: 'Could you please clarify which sub-scheme you're referring to under Udyami Yojna? There are two with different rules.' "
+        "If a user's question does not clearly indicate which sub-scheme they are referring to or is not available in the memory, then ask a clarifying question first. "
+        "Do not assume or guess. Ask: 'Could you please clarify which sub-scheme you're referring to under Udyami Yojna? MMUY or BLUY.' "
         "Once clarified, provide an appropriate response based on the available general knowledge."
         ))
 
