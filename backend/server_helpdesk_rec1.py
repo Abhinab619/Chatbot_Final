@@ -106,7 +106,7 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
                                        name="Udyami_Yojna_head",
                                        description=(
         "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and its two sub-schemes. "
-        "If a user's question does not clearly indicate which sub-scheme they are referring to or is not available in the memory, then ask a clarifying question first. "
+        "If a user's question does not clearly indicate or there is no mention of BLUY or MMUY in the question or is not available in the memory, then only ask a clarifying question first. "
         "Do not assume or guess. Ask: 'Could you please clarify which sub-scheme you're referring to under Udyami Yojna? MMUY or BLUY.' "
         "Once clarified, provide an appropriate response based on the available general knowledge."
         ))
@@ -352,7 +352,7 @@ def chat_with_model(msg: Message):
         prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
 
 
-    
+    msg.text = msg.text + prompt1
 
 
 
