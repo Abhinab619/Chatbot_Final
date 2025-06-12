@@ -378,7 +378,7 @@ def chat_with_model(msg: Message):
         else:
             best_lang = 'en'  # Default to English if unsure
     else:
-        best_lang = 'hi_en'
+        best_lang = 'hi'
 
     # Create prompt
     lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hinglish'}
