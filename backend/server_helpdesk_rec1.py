@@ -105,15 +105,19 @@ retriever001 = vectorstore001.as_retriever(search_type="similarity", search_kwar
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
                                        description=(
-        ''' You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and its two sub-schemes: BLUY and MMUY.
+        '''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna and determine when to invoke sub-scheme-specific tools.
 
-        If the user's current question explicitly mentions "BLUY" or "MMUY", then do not ask for clarification — directly answer the question using the corresponding sub-scheme knowledge.
+        Behavior rules:
 
-        If neither sub-scheme is mentioned in the question, and no prior memory or context identifies one, then do not guess — instead, ask the user:
+        1. If the user's question is clearly about the overall Udyami Yojna (not about MMUY or BLUY), respond with the appropriate general information.
 
-        Could you please clarify which sub-scheme you're referring to under Udyami Yojna? MMUY or BLUY?
+        2. If the user's question explicitly mentions either "MMUY" or "BLUY", do not ask for clarification. Route the question to the corresponding sub-scheme tool and provide a direct answer.
 
-        Once clarified, proceed to provide an accurate and relevant response.'''
+        3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, then do not make assumptions. Instead, ask the user:
+
+        "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY?"
+
+        After clarification, proceed accordingly.'''
         ))
 
 
