@@ -105,10 +105,15 @@ retriever001 = vectorstore001.as_retriever(search_type="similarity", search_kwar
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
                                        description=(
-        "You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and its two sub-schemes. "
-        "If a user's question does not clearly indicate or there is no mention of BLUY or MMUY in the question or is not available in the memory, then only ask a clarifying question first. "
-        "Do not assume or guess. Ask: 'Could you please clarify which sub-scheme you're referring to under Udyami Yojna? MMUY or BLUY.' "
-        "Once clarified, provide an appropriate response based on the available general knowledge."
+        ''' You are an expert assistant for the Udyami Yojna. Your knowledge is limited to the general overview and its two sub-schemes: BLUY and MMUY.
+
+        If the user's current question explicitly mentions "BLUY" or "MMUY", then do not ask for clarification — directly answer the question using the corresponding sub-scheme knowledge.
+
+        If neither sub-scheme is mentioned in the question, and no prior memory or context identifies one, then do not guess — instead, ask the user:
+
+        Could you please clarify which sub-scheme you're referring to under Udyami Yojna? MMUY or BLUY?
+
+        Once clarified, proceed to provide an accurate and relevant response.'''
         ))
 
 
@@ -286,6 +291,10 @@ You are a helpful assistant for the Udyami Yojna scheme.
 You MUST always invoke the appropriate tool to answer the user queries.
 
 Use of Memory is only for remembering the previous question and its context which can be refferred for answering the next question
+
+Each question must be fact-checked using tools, even if it seems obvious.
+
+Also format the answer properly using list and bullet points if possible.
 """
 
 agent_prompt_template = PromptTemplate(
@@ -333,27 +342,42 @@ def chat_with_model(msg: Message):
     
 
 
-    langs = detect_langs(msg.text)
-    print(langs)
+    
 
 
+    import joblib
 
 
-# Filter for only English and Hindi
-    allowed_langs = ['en', 'hi']
-    filtered_langs = [lang for lang in langs if lang.lang in allowed_langs]
+    # Load the saved classifier
+    model_path = os.path.join(BASE_DIR, "../embeddings/en_hinglish_classifier.pkl")
+    pipeline = joblib.load(model_path)
 
-# Choose the one with the highest probability
-    if not filtered_langs:
-        prompt1 = f"Please answer the following questions in en. User's question: {msg.text}"
+    # Predict using the classifier
+    langs = pipeline.predict([msg.text])[0]  # Get string label: 'en' or 'hi_en'
+    print(f"Detected Language using classifier: {langs}")
+
+    # If it's not Hinglish, use langdetect to be sure
+    if langs != 'hi_en':
+        detected = detect_langs(msg.text)
+        print(f"Langdetect result: {detected}")
+
+        # Filter for only English and Hindi
+        allowed_langs = ['en', 'hi']
+        filtered_langs = [lang for lang in detected if lang.lang in allowed_langs]
+
+        # Choose the one with the highest probability
+        if filtered_langs:
+            best_lang = max(filtered_langs, key=lambda x: x.prob).lang
+        else:
+            best_lang = 'en'  # Default to English if unsure
     else:
-        best_lang = max(filtered_langs, key=lambda x: x.prob).lang
-        lang_map = {'en': 'English', 'hi': 'Hindi'}
-        prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
+        best_lang = 'hi_en'
 
+    # Create prompt
+    lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hinglish'}
+    prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
 
     msg.text = msg.text + prompt1
-
 
 
 
