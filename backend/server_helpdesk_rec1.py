@@ -349,8 +349,11 @@ def chat_with_model(msg: Message):
 
 
     # Load the saved classifier
-    model_path = os.path.join(BASE_DIR, "../embeddings/en_hinglish_classifier.pkl")
+    model_path = os.path.join(BASE_DIR, "Embeddings", "en_hinglish_classifier.pkl")
     pipeline = joblib.load(model_path)
+
+    # BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    # EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
 
     # Predict using the classifier
     langs = pipeline.predict([msg.text])[0]  # Get string label: 'en' or 'hi_en'
