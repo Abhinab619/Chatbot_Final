@@ -299,8 +299,6 @@ Use of Memory is only for remembering the previous question and its context whic
 Each question must be fact-checked using tools, even if it seems obvious.
 
 Also format the answer properly using list and bullet points if possible.
-
-Also dont say not available in documents, just say No to the applicable question.
 """
 
 agent_prompt_template = PromptTemplate(
@@ -358,32 +356,29 @@ def chat_with_model(msg: Message):
     model_path = os.path.join(BASE_DIR, "Embeddings", "en_hinglish_classifier.pkl")
     pipeline = joblib.load(model_path)
 
-    predicted_label = pipeline.predict([msg.text])[0]
+    # BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    # EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
 
-    if hasattr(pipeline, "predict_proba"):
-        proba = pipeline.predict_proba([msg.text])[0]
-        class_index = pipeline.classes_.tolist().index(predicted_label)
-        confidence = proba[class_index]
-    else:
-        confidence = 1.0  # Assume full confidence if not available
+    # Predict using the classifier
+    langs = pipeline.predict([msg.text])[0]  # Get string label: 'en' or 'hi_en'
+    print(f"Detected Language using classifier: {langs}")
 
-    print(f"Detected Language using classifier: {predicted_label} with confidence: {confidence:.4f}")
-
-
-    if predicted_label == 'hi_en' and confidence >= 0.6:
-        best_lang = 'hi'
-    else:
-    # Use langdetect to verify
+    # If it's not Hinglish, use langdetect to be sure
+    if langs != 'hi_en':
         detected = detect_langs(msg.text)
         print(f"Langdetect result: {detected}")
 
+        # Filter for only English and Hindi
         allowed_langs = ['en', 'hi']
         filtered_langs = [lang for lang in detected if lang.lang in allowed_langs]
 
+        # Choose the one with the highest probability
         if filtered_langs:
             best_lang = max(filtered_langs, key=lambda x: x.prob).lang
         else:
-            best_lang = 'en'  # fallback
+            best_lang = 'en'  # Default to English if unsure
+    else:
+        best_lang = 'hi'
 
     # Create prompt
     lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hinglish'}
