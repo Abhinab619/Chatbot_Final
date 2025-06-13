@@ -296,7 +296,6 @@ You MUST always invoke the appropriate tool to answer the user queries.
 
 Use of Memory is only for remembering the previous question and its context which can be refferred for answering the next question
 
-Each question must be fact-checked using tools, even if it seems obvious.
 
 Also format the answer properly using list and bullet points if possible.
 """
@@ -381,7 +380,7 @@ def chat_with_model(msg: Message):
         best_lang = 'hi'
 
     # Create prompt
-    lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hinglish'}
+    lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hindi'}
     prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
 
     msg.text = msg.text + prompt1
