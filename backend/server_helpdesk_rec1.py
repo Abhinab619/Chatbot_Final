@@ -18,6 +18,7 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 import pandas as pd
 from langchain_community.vectorstores import FAISS
+from langchain_core.output_parsers import StrOutputParser
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
 
@@ -57,7 +58,7 @@ class HelplineLog(BaseModel):
     name: Optional[str]
     application_id: Optional[str]
     mobile_number: Optional[str]
-    query: str
+    issue: str
 
 
 # Step 1: Parser and prompt setup
@@ -70,6 +71,7 @@ Extract the following information from the user input:
 - Name
 - Application ID
 - Mobile Number
+- Issue
 
 
 Only extract what is present. Leave missing fields as null.
@@ -163,24 +165,24 @@ chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
 # tool12
 
 @tool
-def helpline_query_logger(text: str ) -> str:
+def helpline_query_logger(text: str) -> dict:
     """
-    If query is out of scope or user asks for further assistance 
-    then this tool Asks for user's name and application ID if not provided and logs them into an Excel sheet along with the query,
-    If application ID is not available ask for mobile number.
-    Asks for missing info and only logs to Excel once all required data is collected.
+    Collects Full Name, Application ID (or Mobile Number), and Issue from the user
+    Only ask for those field which are required
+    and logs it only when all are explicitly provided.
     """
     global current_user_id
     user_id = current_user_id
     if not user_id or user_id not in connected_users:
         return {"query_logged": False, "error": "Invalid or missing user_id"}
+
     try:
         chain = prompt | chat | log_parser
         result: HelplineLog = chain.invoke({"user_input": text})
-        
-        # Get buffer
+
+        # Get or create buffer
         buffer = connected_users[user_id].get("helpline_log_buffer", {})
-        
+
         # Update buffer
         if result.name:
             buffer["Name"] = result.name
@@ -188,20 +190,39 @@ def helpline_query_logger(text: str ) -> str:
             buffer["Application ID"] = result.application_id
         if result.mobile_number:
             buffer["Mobile Number"] = result.mobile_number
-        if result.query:
-            buffer["Query"] = result.query
-        
-        # Save back buffer
+        if result.issue:
+            buffer["Issue"] = result.issue
+
+            # Use LLM or logic to confirm it's a real issue
+            issue_check_prompt = PromptTemplate.from_template(
+                "Does the following text describe a valid user issue or request for help? Reply only 'yes' or 'no'.\n\nIssue: {text}"
+            )
+            is_valid_issue_chain = issue_check_prompt | chat | StrOutputParser()
+
+            try:
+                verdict = is_valid_issue_chain.invoke({"text": result.issue}).strip().lower()
+                if verdict.startswith("yes"):
+                    buffer["IssueConfirmed"] = True
+            except Exception as e:
+                print("Issue validation failed:", str(e))
+
+
+        # Save buffer
         connected_users[user_id]["helpline_log_buffer"] = buffer
 
-        # Check if all required data is present
-        if buffer.get("Name") and (buffer.get("Application ID") or buffer.get("Mobile Number")) and buffer.get("Query"):
+        # Check for required info
+        if (
+            buffer.get("Name")
+            and (buffer.get("Application ID") or buffer.get("Mobile Number"))
+            and buffer.get("Issue")
+            and buffer.get("IssueConfirmed") is True
+        ):
             row = {
                 "Timestamp": datetime.now().isoformat(),
                 "Name": buffer["Name"],
                 "Application ID": buffer.get("Application ID"),
                 "Mobile Number": buffer.get("Mobile Number"),
-                "Query": buffer["Query"],
+                "Issue": buffer["Issue"],
             }
 
             log_path = "helpline_log.xlsx"
@@ -213,27 +234,31 @@ def helpline_query_logger(text: str ) -> str:
             df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
             df.to_excel(log_path, index=False)
 
-            # Clear the buffer
+            # Clear buffer after logging
             connected_users[user_id]["helpline_log_buffer"] = {}
+
+            if "memory" in connected_users[user_id]:
+                connected_users[user_id]["memory"].clear()
 
             return {
                 "query_logged": True,
                 "logged_name": row["Name"],
                 "logged_application_id": row["Application ID"],
                 "logged_mobile_number": row["Mobile Number"],
-                "logged_query": row["Query"],
+                "logged_issue": row["Issue"],
                 "logged_timestamp": row["Timestamp"],
                 "status": "Successfully logged"
             }
+
         else:
             missing = []
             if not buffer.get("Name"):
                 missing.append("Name")
             if not (buffer.get("Application ID") or buffer.get("Mobile Number")):
                 missing.append("Application ID or Mobile Number")
-            if not buffer.get("Query"):
-                missing.append("Query")
-            
+            if not buffer.get("IssueConfirmed"):
+                missing.append("Issue")
+
             return {
                 "query_logged": False,
                 "status": "Waiting for more information",
@@ -246,6 +271,7 @@ def helpline_query_logger(text: str ) -> str:
             "query_logged": False,
             "error": str(e)
         }
+
  
 
 
