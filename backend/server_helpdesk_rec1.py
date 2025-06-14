@@ -55,10 +55,11 @@ from pydantic import BaseModel
 from typing import Optional
 
 class HelplineLog(BaseModel):
-    name: Optional[str]
+    name: str
     application_id: Optional[str]
     mobile_number: Optional[str]
     issue: str
+    district :str 
 
 
 # Step 1: Parser and prompt setup
@@ -72,6 +73,7 @@ Extract the following information from the user input:
 - Application ID
 - Mobile Number
 - Issue
+- District
 
 
 Only extract what is present. Leave missing fields as null.
@@ -115,9 +117,11 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
 
         2. If the user's question explicitly mentions either "MMUY" or "BLUY", do not ask for clarification. Route the question to the corresponding sub-scheme tool and provide a direct answer.
 
-        3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, then do not make assumptions. Instead, ask the user:
+        **Important:         3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, then do not make assumptions. Instead, ask the user:
 
-        "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY?"
+        "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY" 
+        
+        and answer depending on wether user gives "MMUY or BLUY".
 
         After clarification, proceed accordingly.'''
         ))
@@ -167,9 +171,10 @@ chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
 @tool
 def helpline_query_logger(text: str) -> dict:
     """
-    Collects Full Name, Application ID (or Mobile Number), and Issue from the user
+    Collects Full Name, Application ID (or Mobile Number), and Issue from the user, and the District
     Only ask for those field which are required
-    and logs it only when all are explicitly provided.
+    and logs it only when all are explicitly provided,
+    also only say its logged when it is completely logged otherwise dont
     """
     global current_user_id
     user_id = current_user_id
@@ -192,6 +197,8 @@ def helpline_query_logger(text: str) -> dict:
             buffer["Mobile Number"] = result.mobile_number
         if result.issue:
             buffer["Issue"] = result.issue
+        if result.district:
+            buffer["District"] = result.district
 
             # Use LLM or logic to confirm it's a real issue
             issue_check_prompt = PromptTemplate.from_template(
@@ -215,6 +222,7 @@ def helpline_query_logger(text: str) -> dict:
             buffer.get("Name")
             and (buffer.get("Application ID") or buffer.get("Mobile Number"))
             and buffer.get("Issue")
+            and buffer.get("District")
             and buffer.get("IssueConfirmed") is True
         ):
             row = {
@@ -222,6 +230,7 @@ def helpline_query_logger(text: str) -> dict:
                 "Name": buffer["Name"],
                 "Application ID": buffer.get("Application ID"),
                 "Mobile Number": buffer.get("Mobile Number"),
+                "District" : buffer.get("District"),
                 "Issue": buffer["Issue"],
             }
 
@@ -246,6 +255,7 @@ def helpline_query_logger(text: str) -> dict:
                 "logged_application_id": row["Application ID"],
                 "logged_mobile_number": row["Mobile Number"],
                 "logged_issue": row["Issue"],
+                "logged_district": row["District"],
                 "logged_timestamp": row["Timestamp"],
                 "status": "Successfully logged"
             }
@@ -256,6 +266,8 @@ def helpline_query_logger(text: str) -> dict:
                 missing.append("Name")
             if not (buffer.get("Application ID") or buffer.get("Mobile Number")):
                 missing.append("Application ID or Mobile Number")
+            if not buffer.get("District"):
+                missing.append("District")
             if not buffer.get("IssueConfirmed"):
                 missing.append("Issue")
 
@@ -388,8 +400,12 @@ def chat_with_model(msg: Message):
     langs = pipeline.predict([msg.text])[0]  # Get string label: 'en' or 'hi_en'
     print(f"Detected Language using classifier: {langs}")
 
+    proba = pipeline.predict_proba([msg.text])[0]
+    confidence = max(proba)
+    print(f"Confidence Score : {confidence}")
+
     # If it's not Hinglish, use langdetect to be sure
-    if langs != 'hi_en':
+    if langs != 'hi_en' or confidence < 0.6 :
         detected = detect_langs(msg.text)
         print(f"Langdetect result: {detected}")
 
