@@ -159,7 +159,7 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
         **Important:         3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, then do not make assumptions. Instead, ask the user:
         
         
-        if current language flow is english : ask "Could you please clarify which sub-scheme you\'re referring to under Udyami Yojna — MMUY or BLUY?"
+        if current language flow is english : ask "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY"
         else ask "कृपया स्पष्ट करें कि आप उद्यमी योजना के अंतर्गत किस उप-योजना का उल्लेख कर रहे हैं — MMUY या BLUY?"
         
 
@@ -211,7 +211,7 @@ chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
 @tool
 def helpline_query_logger(text: str) -> dict:
     """
-    Collects Full Name, Application ID (or Mobile Number), and Issue from the user, and the District
+    Give this Format as example for them to see - "Name : Abhinab Kumar, ID/Number : 93867763XX , Issue : Unable to get second tranche , District : Patna (Also tell them to Give all the information in one line)"
     Only ask for those field which are required
     and logs it only when all are explicitly provided,
     also only say its logged when it is completely logged otherwise dont
