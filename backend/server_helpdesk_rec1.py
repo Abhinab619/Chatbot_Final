@@ -5,20 +5,17 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain.tools.retriever import create_retriever_tool
 from langchain.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain import hub
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 import os
 from datetime import datetime, timedelta
 import uuid
-from langdetect import detect_langs
 from langchain.memory import ConversationBufferWindowMemory
-from openpyxl import Workbook, load_workbook
-import re
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 import pandas as pd
 from langchain_community.vectorstores import FAISS
 from langchain_core.output_parsers import StrOutputParser
+from lingua import Language, LanguageDetectorBuilder
 
 INACTIVITY_TIMEOUT = timedelta(minutes=5)
 
@@ -47,7 +44,49 @@ class Message(BaseModel):
     text: str
     user_id : str
 
+ 
+def detect_language_and_set(msg_text):
+    import joblib
+    
 
+    # Load the saved classifier
+    model_path = os.path.join(BASE_DIR, "Embeddings", "en_hinglish_classifier.pkl")
+    pipeline = joblib.load(model_path)
+
+    # Predict using the classifier
+    langs = pipeline.predict([msg_text])[0]
+    print(f"Detected Language using classifier: {langs}")
+
+    proba = pipeline.predict_proba([msg_text])[0]
+    confidence = max(proba)
+    print(f"Confidence Score : {confidence}")
+
+    # If it's not Hinglish or low confidence, fallback to lingua
+    if langs != 'hi_en' or confidence < 0.6:
+        # Set up lingua
+        lang_codes = {
+            Language.ENGLISH: 'en',
+            Language.HINDI: 'hi'
+        }
+        languages = list(lang_codes.keys())
+        detector = LanguageDetectorBuilder.from_languages(*languages).build()
+
+        # Detect language using lingua
+        detected_lang = detector.detect_language_of(msg_text)
+        print(f"Lingua detected language: {detected_lang}")
+
+        best_lang = lang_codes.get(detected_lang, 'en')  # Default to 'en' if not found
+    else:
+        best_lang = 'hi'
+
+    return best_lang
+
+
+
+    
+# def clarification(message: Message):
+#     best_lang = detect_language_and_set(message.text)
+    
 
 
 # models/helpline_schema.py
@@ -109,7 +148,7 @@ retriever001 = vectorstore001.as_retriever(search_type="similarity", search_kwar
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
                                        description=(
-        '''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna and determine when to invoke sub-scheme-specific tools.
+        f'''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna and determine when to invoke sub-scheme-specific tools.
 
         Behavior rules:
 
@@ -118,10 +157,11 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
         2. If the user's question explicitly mentions either "MMUY" or "BLUY", do not ask for clarification. Route the question to the corresponding sub-scheme tool and provide a direct answer.
 
         **Important:         3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, then do not make assumptions. Instead, ask the user:
-
-        "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY" 
         
-        and answer depending on wether user gives "MMUY or BLUY".
+        
+        if current language flow is english : ask "Could you please clarify which sub-scheme you\'re referring to under Udyami Yojna — MMUY or BLUY?"
+        else ask "कृपया स्पष्ट करें कि आप उद्यमी योजना के अंतर्गत किस उप-योजना का उल्लेख कर रहे हैं — MMUY या BLUY?"
+        
 
         After clarification, proceed accordingly.'''
         ))
@@ -164,8 +204,8 @@ retriever_tool11 = create_retriever_tool(retriever=retriever11,
 # Direct Gemini Tool (tool 9)
 chat = ChatGoogleGenerativeAI(model="gemini-2.0-flash",
                               google_api_key="AIzaSyBFZDpEerP3W81DKM8FoOfolI9MDTppBLg",
-                              temperature=0,
-                              top_k=1)
+                              temperature=0,                                   # lower the value means less random and creative answers        
+                              top_k=1)                                         # low for factual Output
 # tool12
 
 @tool
@@ -354,6 +394,8 @@ agent = create_tool_calling_agent(
 
 connected_users = {}
 current_user_id = None  # global variable
+
+
 @app.post("/chat")
 def chat_with_model(msg: Message):
     global current_user_id
@@ -382,44 +424,13 @@ def chat_with_model(msg: Message):
 
     
 
-
+    best_lang = detect_language_and_set(msg.text) 
     
 
 
-    import joblib
+    
 
-
-    # Load the saved classifier
-    model_path = os.path.join(BASE_DIR, "Embeddings", "en_hinglish_classifier.pkl")
-    pipeline = joblib.load(model_path)
-
-    # BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-    # EMBEDDINGS_DIR = os.path.join(BASE_DIR, "Embeddings")
-
-    # Predict using the classifier
-    langs = pipeline.predict([msg.text])[0]  # Get string label: 'en' or 'hi_en'
-    print(f"Detected Language using classifier: {langs}")
-
-    proba = pipeline.predict_proba([msg.text])[0]
-    confidence = max(proba)
-    print(f"Confidence Score : {confidence}")
-
-    # If it's not Hinglish, use langdetect to be sure
-    if langs != 'hi_en' or confidence < 0.6 :
-        detected = detect_langs(msg.text)
-        print(f"Langdetect result: {detected}")
-
-        # Filter for only English and Hindi
-        allowed_langs = ['en', 'hi']
-        filtered_langs = [lang for lang in detected if lang.lang in allowed_langs]
-
-        # Choose the one with the highest probability
-        if filtered_langs:
-            best_lang = max(filtered_langs, key=lambda x: x.prob).lang
-        else:
-            best_lang = 'en'  # Default to English if unsure
-    else:
-        best_lang = 'hi'
+    
 
     # Create prompt
     lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hindi'}
