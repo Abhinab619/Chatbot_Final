@@ -148,7 +148,7 @@ retriever001 = vectorstore001.as_retriever(search_type="similarity", search_kwar
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
                                        description=(
-        f'''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna and determine when to invoke sub-scheme-specific tools.
+        f'''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna, and Designatories involved if asked (like CM,IAS and so on) and determine when to invoke sub-scheme-specific tools.
 
         Behavior rules:
 
