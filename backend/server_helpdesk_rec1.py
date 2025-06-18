@@ -161,6 +161,8 @@ retriever_tool001 = create_retriever_tool(retriever=retriever001,
         
         if current language flow is english : ask "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY"
         else ask "कृपया स्पष्ट करें कि आप उद्यमी योजना के अंतर्गत किस उप-योजना का उल्लेख कर रहे हैं — MMUY या BLUY?"
+
+        once asked for a specific scheme, answer only for it and don't ask for which scheme unless explicitly asked.
         
 
         After clarification, proceed accordingly.'''
