@@ -148,24 +148,18 @@ retriever001 = vectorstore001.as_retriever(search_type="similarity", search_kwar
 retriever_tool001 = create_retriever_tool(retriever=retriever001,                           
                                        name="Udyami_Yojna_head",
                                        description=(
-        f'''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna, and Designatories involved if asked (like CM,IAS and so on) and determine when to invoke sub-scheme-specific tools.
+        f'''You are an expert assistant for the Udyami Yojna scheme. You can answer questions related to the general overview of the Yojna, and Designatories/ministers/officials involved and determine when to invoke sub-scheme-specific tools.
 
         Behavior rules:
 
         1. If the user's question is clearly about the overall Udyami Yojna (not about MMUY or BLUY), respond with the appropriate general information.
 
-        2. If the user's question explicitly mentions either "MMUY" or "BLUY", do not ask for clarification. Route the question to the corresponding sub-scheme tool and provide a direct answer.
-
-        **Important:         3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, then do not make assumptions. Instead, ask the user:
         
-        
-        if current language flow is english : ask "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY"
-        else ask "कृपया स्पष्ट करें कि आप उद्यमी योजना के अंतर्गत किस उप-योजना का उल्लेख कर रहे हैं — MMUY या BLUY?"
 
         
         
 
-        After clarification, proceed accordingly.'''
+        '''
         ))
 
 
@@ -370,21 +364,49 @@ tools = [ retriever_tool001, retriever_tool10, retriever_tool11, helpline_query_
 AGENT_INSTRUCTIONS = """
 You are a helpful assistant for the Udyami Yojna scheme.
 
-**Important: You must NOT answer questions directly from your memory or LLM knowledge.**
+1. If the user's question explicitly mentions either "MMUY" or "BLUY", do not ask for clarification. Route the question to the corresponding sub-scheme tool and provide a direct answer.
 
-You MUST always invoke the appropriate tool to answer the user queries.
+2. If `active_scheme` is already set (i.e., not None), do not ask for clarification again. Use the active scheme to answer current and follow-up questions.
 
-Use of Memory is only for remembering the previous question and its context which can be refferred for answering the next question
+3. If the user's question is not about general Udyami Yojna, and it does not mention MMUY or BLUY, and active_scheme is not set, then do not make assumptions. Instead, ask the user:
 
-once asked for a specific scheme, answer only for it and don't ask for which scheme unless explicitly asked.
+- If the current language flow is English: ask "Could you please clarify which sub-scheme you're referring to under Udyami Yojna — MMUY or BLUY?"
+- other wise: ask "कृपया स्पष्ट करें कि आप उद्यमी योजना के अंतर्गत किस उप-योजना का उल्लेख कर रहे हैं — MMUY या BLUY?"
+
+This clarification should be asked **only once** — never again after scheme is selected.
+
+4. Once any of the keywords are found, you must:
+   - Identify and store the selected scheme.
+   - Use it for the current and all future responses.
+   - Never ask the user to repeat the question.
+   - If the user had asked a question **before** selecting the scheme, use that previous question now.
+   - Do not switch schemes unless explicitly changed by the user using a valid keyword.
+
+5. You must always invoke the appropriate tool to answer user queries. Do not answer directly using memory.
+
+6. If the data is not available, say "No." — not "not available in the database".
+
+7. Format answers properly using lists or bullet points if applicable.
+
+Important: These rules override all other instructions and must be followed strictly at all times
 
 
-Also format the answer properly using list and bullet points if possible.
 """
 
 agent_prompt_template = PromptTemplate(
-    input_variables=["input", "agent_scratchpad", "chat_history"],
-    template=AGENT_INSTRUCTIONS + "\n\nChat History:\n{chat_history}\n\nUser Input: {input}\n{agent_scratchpad}",
+    input_variables=["input", "agent_scratchpad", "chat_history", "active_scheme"],
+    template=AGENT_INSTRUCTIONS + """
+
+Active Scheme: {active_scheme}
+
+Chat History:
+{chat_history}
+
+User Input: {input}
+
+{agent_scratchpad}
+""",
+
 )
 
 
@@ -404,6 +426,7 @@ current_user_id = None  # global variable
 def chat_with_model(msg: Message):
     global current_user_id
     remove_inactive_users()
+
     if not msg.user_id or not msg.user_id.strip():
         user_id = generate_user_id()
     else:
@@ -417,38 +440,59 @@ def chat_with_model(msg: Message):
             "first_seen": now,
             "last_active": now,
             "total_messages": 0,
-            "memory": ConversationBufferWindowMemory(k=4, return_messages=True, memory_key="chat_history"),
-            "helpline_log_buffer": {}
+            "memory": ConversationBufferWindowMemory(k=4, return_messages=True, memory_key="chat_history", input_key="input"),
+            "helpline_log_buffer": {},
+            "active_scheme": None,
+            "last_question": None,
+            "last_bot_message": None
         }
 
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     connected_users[user_id]["last_active"] = now
     connected_users[user_id]["total_messages"] += 1
 
-
-    
-
-    best_lang = detect_language_and_set(msg.text) 
-    
-
-
-    
-
-    
-
-    # Create prompt
+    best_lang = detect_language_and_set(msg.text)
     lang_map = {'en': 'English', 'hi': 'Hindi', 'hi_en': 'Hindi'}
     prompt1 = f"Please answer the following question in {lang_map[best_lang]}. User's question: {msg.text}"
+    user_input_lower = msg.text.strip().lower()
 
+    clarification_msgs = [
+        "could you please clarify which sub-scheme you're referring to under udyami yojna — mmuy or bluy?",
+        "कृपया स्पष्ट करें कि आप उद्यमी योजना के अंतर्गत किस उप-योजना का उल्लेख कर रहे हैं — mmuy या bluy?"
+    ]
+
+    last_bot_msg = connected_users[user_id].get("last_bot_message")
+    run_scheme_logic = (last_bot_msg or "").strip().lower() in clarification_msgs
+
+    if run_scheme_logic:
+        # Only process scheme logic if clarification message was last sent
+        if user_input_lower in ["mmuy", "bluy"]:
+            connected_users[user_id]["active_scheme"] = user_input_lower.upper()
+        elif ("bluy" in user_input_lower or "बिहार लघु उद्यमी योजना" in user_input_lower or "for बिहार लघु उद्यमी योजना" in user_input_lower or "for बिहार लघु उद्यमी योजना (bluy)" in user_input_lower):
+            connected_users[user_id]["active_scheme"] = "BLUY"
+        elif ("mmuy" in user_input_lower or "मुख्यमंत्री उद्यमी योजना" in user_input_lower or "for मुख्यमंत्री उद्यमी योजना" in user_input_lower or "for मुख्यमंत्री उद्यमी योजना (mmuy)" in user_input_lower):
+            connected_users[user_id]["active_scheme"] = "MMUY"
+            
+            last_question = connected_users[user_id].get("last_question")
+            if last_question:
+                msg.text = last_question
+                connected_users[user_id]["last_question"] = None
+            else:
+                msg.text = "Give me a brief of this scheme."
+        else:
+            clarification_message = clarification_msgs[0] if best_lang != "hi" else clarification_msgs[1]
+            connected_users[user_id]["last_bot_message"] = clarification_message
+            connected_users[user_id]["last_question"] = msg.text
+            return {
+                "user_id": user_id,
+                "response": clarification_message,
+                "intermediate_steps": [],
+                "helpline_log": None
+            }
+
+    # Else: No scheme logic – just proceed normally
     msg.text = msg.text + prompt1
-
-
-
-    
-
-
-
-
+    connected_users[user_id]["last_question"] = msg.text
 
     agent_executor = AgentExecutor(
         agent=agent,
@@ -458,58 +502,24 @@ def chat_with_model(msg: Message):
         return_intermediate_steps=True,
     )
 
-    
+    response = agent_executor.invoke({
+        "input": msg.text,
+        "active_scheme": connected_users[user_id].get("active_scheme", "")
+    })
 
-    response = agent_executor.invoke({"input": msg.text})                                   # Final Answer
+    # Store the bot response for next round
+    connected_users[user_id]["last_bot_message"] = response.get("output", "")
 
-    steps = response.get("intermediate_steps", [])
-
-    # Check if helpline logger tool was triggered
-    # query_logged = False
-    # logged_message = ""
-
-    # for step in steps:
-    #     if hasattr(step[0], 'tool') and step[0].tool == "helpline_query_logger":
-    #         query_logged = True
-    #         logged_message = step[1]  # The output of the tool
-    #         break
+    # Check helpline tool output
     helpline_data = None
     for step in response.get("intermediate_steps", []):
         if hasattr(step[0], 'tool') and step[0].tool == "helpline_query_logger":
-            helpline_data = step[1]  # This is the dict returned from the tool
+            helpline_data = step[1]
             break
-    
 
-
-    
-
-    memory = connected_users[user_id]["memory"]
-    print(memory.chat_memory.messages)
-
-    
-
-
-
-    recommended_question = "More about Udyami Yojna eligibility or application process?"
-
-    print(f"Recommended follow-up question for user {user_id}: {recommended_question}")
-
-    print("\n--- Connected Users Log ---")
-    for uid, details in connected_users.items():
-        print(f"User ID: {uid}, First Seen: {details['first_seen']}, Last Active: {details['last_active']}, Total Messages: {details['total_messages']}")
-    print("---------------------------\n")
-
-    
-    
     return {
         "user_id": user_id,
         "response": response.get("output", "No response generated"),
         "intermediate_steps": response.get("intermediate_steps", []),
-        "recommended_question": recommended_question,
         "helpline_log": helpline_data
-        
     }
-
-    
-
-
