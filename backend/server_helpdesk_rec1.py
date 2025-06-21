@@ -301,7 +301,7 @@ def helpline_query_logger(text: str) -> dict:
                 "logged_timestamp": row["Timestamp"],
                 "status": "Successfully logged"
             }
-
+            
         else:
             missing = []
             if not buffer.get("Name"):
